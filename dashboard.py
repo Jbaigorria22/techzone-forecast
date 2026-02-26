@@ -213,6 +213,17 @@ st.markdown("""
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH  = BASE_DIR / "data" / "techzone.db"
 
+# ── AUTO-SETUP ───────────────────────────────────────────────
+# Si la base de datos no existe (ej: primer deploy en la nube)
+# la generamos automáticamente ejecutando el script de setup.
+if not DB_PATH.exists():
+    import subprocess, sys
+    os.makedirs(BASE_DIR / "data", exist_ok=True)
+    subprocess.run(
+        [sys.executable, str(BASE_DIR / "src" / "01_setup_database.py")],
+        check=True
+    )
+
 
 # ════════════════════════════════════════════════════════════
 # FUNCIONES DE DATOS

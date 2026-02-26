@@ -1,0 +1,17 @@
+# Base de datos (se genera automáticamente)
+data/techzone.db
+
+# Gráficas generadas
+outputs/
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db

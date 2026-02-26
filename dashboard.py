@@ -1,6 +1,6 @@
 # ============================================================
-# FASE 5 v3.0: Dashboard con Pagina de Inicio
-# TechZone Forecast System
+# TechZone Forecast System v3.0
+# Dashboard interactivo con Prophet ML y Supply Chain Analytics
 # Ejecutar con: python -m streamlit run dashboard.py
 # ============================================================
 
@@ -14,11 +14,27 @@ import matplotlib.patches as mpatches
 from prophet import Prophet
 from pathlib import Path
 from io import BytesIO
+import os
 import warnings
 warnings.filterwarnings("ignore")
 
+# ── RUTAS ────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH  = BASE_DIR / "data" / "techzone.db"
+
+# ── AUTO-SETUP ───────────────────────────────────────────────
+# Si la base de datos no existe (primer deploy en la nube)
+# la generamos automaticamente ejecutando el script de setup.
+if not DB_PATH.exists():
+    import subprocess, sys
+    os.makedirs(BASE_DIR / "data", exist_ok=True)
+    subprocess.run(
+        [sys.executable, str(BASE_DIR / "src" / "01_setup_database.py")],
+        check=True
+    )
+
 # ════════════════════════════════════════════════════════════
-# CONFIGURACION
+# CONFIGURACION DE PAGINA
 # ════════════════════════════════════════════════════════════
 
 st.set_page_config(
@@ -28,15 +44,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado para mejorar el diseño visual
+# CSS personalizado
 st.markdown("""
 <style>
-    /* Fondo general mas oscuro y elegante */
     .stApp {
         background-color: #0f1117;
     }
-
-    /* Tarjetas de metricas */
     div[data-testid="metric-container"] {
         background: linear-gradient(135deg, #1e2130, #252840);
         border: 1px solid #3d4166;
@@ -44,21 +57,15 @@ st.markdown("""
         padding: 16px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
-
-    /* Titulos de metricas */
     div[data-testid="metric-container"] label {
         color: #8892b0 !important;
         font-size: 0.85rem !important;
     }
-
-    /* Valores de metricas */
     div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
         color: #ccd6f6 !important;
         font-size: 1.8rem !important;
         font-weight: 700 !important;
     }
-
-    /* Tarjetas de caracteristicas en la landing */
     .feature-card {
         background: linear-gradient(135deg, #1e2130, #252840);
         border: 1px solid #3d4166;
@@ -66,33 +73,15 @@ st.markdown("""
         padding: 24px;
         text-align: center;
         height: 100%;
-        transition: transform 0.2s;
     }
-
-    .feature-card:hover {
-        transform: translateY(-4px);
-        border-color: #64ffda;
-    }
-
-    .feature-icon {
-        font-size: 2.5rem;
-        margin-bottom: 12px;
-    }
-
+    .feature-icon { font-size: 2.5rem; margin-bottom: 12px; }
     .feature-title {
         color: #ccd6f6;
         font-size: 1.1rem;
         font-weight: 600;
         margin-bottom: 8px;
     }
-
-    .feature-desc {
-        color: #8892b0;
-        font-size: 0.9rem;
-        line-height: 1.5;
-    }
-
-    /* Hero section */
+    .feature-desc { color: #8892b0; font-size: 0.9rem; line-height: 1.5; }
     .hero-container {
         background: linear-gradient(135deg, #0a192f 0%, #112240 50%, #0a192f 100%);
         border: 1px solid #1d3461;
@@ -101,7 +90,6 @@ st.markdown("""
         text-align: center;
         margin-bottom: 32px;
     }
-
     .hero-title {
         font-size: 3rem;
         font-weight: 800;
@@ -109,14 +97,12 @@ st.markdown("""
         margin-bottom: 8px;
         letter-spacing: -1px;
     }
-
     .hero-subtitle {
         font-size: 1.3rem;
         color: #64ffda;
         margin-bottom: 16px;
         font-weight: 400;
     }
-
     .hero-desc {
         font-size: 1rem;
         color: #8892b0;
@@ -124,8 +110,6 @@ st.markdown("""
         margin: 0 auto;
         line-height: 1.7;
     }
-
-    /* Badge de tecnologias */
     .tech-badge {
         display: inline-block;
         background: #112240;
@@ -137,8 +121,6 @@ st.markdown("""
         margin: 4px;
         font-weight: 500;
     }
-
-    /* Stat destacado */
     .stat-highlight {
         background: linear-gradient(135deg, #0a192f, #112240);
         border: 1px solid #64ffda;
@@ -146,50 +128,28 @@ st.markdown("""
         padding: 20px;
         text-align: center;
     }
-
-    .stat-number {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: #64ffda;
-    }
-
-    .stat-label {
-        color: #8892b0;
-        font-size: 0.9rem;
-        margin-top: 4px;
-    }
-
-    /* Tabs personalizados */
+    .stat-number { font-size: 2.5rem; font-weight: 800; color: #64ffda; }
+    .stat-label { color: #8892b0; font-size: 0.9rem; margin-top: 4px; }
     .stTabs [data-baseweb="tab-list"] {
         background-color: #1e2130;
         border-radius: 10px;
         padding: 4px;
         gap: 4px;
     }
-
     .stTabs [data-baseweb="tab"] {
         border-radius: 8px;
         color: #8892b0;
         font-weight: 500;
     }
-
     .stTabs [aria-selected="true"] {
         background-color: #252840 !important;
         color: #64ffda !important;
     }
-
-    /* Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #0d1117;
         border-right: 1px solid #1d3461;
     }
-
-    /* Divider personalizado */
-    hr {
-        border-color: #1d3461;
-    }
-
-    /* Boton de descarga */
+    hr { border-color: #1d3461; }
     .stDownloadButton button {
         background: linear-gradient(135deg, #64ffda, #00bcd4);
         color: #0a192f;
@@ -200,29 +160,8 @@ st.markdown("""
         font-size: 1rem;
         width: 100%;
     }
-
-    /* Info boxes */
-    .stInfo {
-        background-color: #112240;
-        border-left-color: #64ffda;
-    }
 </style>
 """, unsafe_allow_html=True)
-
-# ── RUTAS ────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH  = BASE_DIR / "data" / "techzone.db"
-
-# ── AUTO-SETUP ───────────────────────────────────────────────
-# Si la base de datos no existe (ej: primer deploy en la nube)
-# la generamos automáticamente ejecutando el script de setup.
-if not DB_PATH.exists():
-    import subprocess, sys
-    os.makedirs(BASE_DIR / "data", exist_ok=True)
-    subprocess.run(
-        [sys.executable, str(BASE_DIR / "src" / "01_setup_database.py")],
-        check=True
-    )
 
 
 # ════════════════════════════════════════════════════════════
@@ -365,10 +304,10 @@ def calcular_mae(real, predicho):
 # ════════════════════════════════════════════════════════════
 
 def calcular_abc(df_todos):
-    df              = df_todos.copy().sort_values(
+    df               = df_todos.copy().sort_values(
         "ingresos_totales", ascending=False
     )
-    total           = df["ingresos_totales"].sum()
+    total            = df["ingresos_totales"].sum()
     df["porcentaje"] = df["ingresos_totales"] / total * 100
     df["acumulado"]  = df["porcentaje"].cumsum()
 
@@ -432,6 +371,7 @@ TEXT_MAIN  = "#ccd6f6"
 TEXT_SUB   = "#8892b0"
 GRID_COLOR = "#1d3461"
 
+
 def estilo_dark(fig, ax_list):
     fig.patch.set_facecolor(DARK_BG)
     for ax in (ax_list if isinstance(ax_list, list) else [ax_list]):
@@ -447,9 +387,8 @@ def estilo_dark(fig, ax_list):
 
 def fig_landing_preview(df_todas):
     fig, ax = plt.subplots(figsize=(12, 3))
-    colores = ["#64ffda", "#ff6b6b", "#ffd166", "#06d6a0", "#118ab2"]
-    productos = df_todas["nombre"].unique()
-    for i, prod in enumerate(productos):
+    colores  = ["#64ffda", "#ff6b6b", "#ffd166", "#06d6a0", "#118ab2"]
+    for i, prod in enumerate(df_todas["nombre"].unique()):
         datos = df_todas[df_todas["nombre"] == prod]
         ax.plot(datos["fecha"], datos["cantidad_vendida"],
                 color=colores[i % len(colores)],
@@ -493,7 +432,7 @@ def fig_historico(df, producto):
 
 def fig_forecast(df, forecast_vals, modelo_nombre,
                  es_prophet=False, prophet_data=None):
-    fig, ax = plt.subplots(figsize=(11, 4))
+    fig, ax     = plt.subplots(figsize=(11, 4))
     ultimo      = df["fecha"].max()
     fechas_fore = pd.date_range(
         start=ultimo + pd.DateOffset(months=1),
@@ -511,7 +450,8 @@ def fig_forecast(df, forecast_vals, modelo_nombre,
                 label="Ajuste Prophet", alpha=0.7)
         ax.plot(fut_fore["ds"], fut_fore["yhat"],
                 color="#ff6b6b", linewidth=2.5,
-                marker="o", markersize=5, label="Forecast 2025")
+                marker="o", markersize=5,
+                label="Forecast 2025")
         ax.fill_between(
             fut_fore["ds"],
             fut_fore["yhat_lower"],
@@ -522,7 +462,8 @@ def fig_forecast(df, forecast_vals, modelo_nombre,
     else:
         ax.plot(fechas_fore, forecast_vals,
                 color="#ff6b6b", linewidth=2.5,
-                marker="o", markersize=5, label="Forecast 2025")
+                marker="o", markersize=5,
+                label="Forecast 2025")
 
     ax.axvline(x=ultimo, color=TEXT_SUB,
                linestyle=":", linewidth=1.5, alpha=0.6)
@@ -553,13 +494,11 @@ def fig_abc(df_abc):
         axes[0].text(
             bar.get_width() + 0.02,
             bar.get_y() + bar.get_height() / 2,
-            f"${row['ingresos_totales']/1_000_000:.2f}M  "
-            f"[{row['categoria_abc']}]",
+            f"${row['ingresos_totales']/1_000_000:.2f}M [{row['categoria_abc']}]",
             va="center", fontsize=9, color=TEXT_SUB
         )
     axes[0].set_xlabel("Ingresos en Millones ($)")
-    axes[0].set_xlim(0, df_abc["ingresos_totales"].max() / 1_000_000 * 1.5)
-
+    axes[0].set_xlim(0, df_abc["ingresos_totales"].max() / 1_000_000 * 1.55)
     leyenda = [
         mpatches.Patch(color="#ff6b6b", label="A — maxima prioridad"),
         mpatches.Patch(color="#ffd166", label="B — prioridad media"),
@@ -568,18 +507,16 @@ def fig_abc(df_abc):
     axes[0].legend(handles=leyenda, fontsize=8,
                    facecolor=CARD_BG, edgecolor=GRID_COLOR,
                    labelcolor=TEXT_SUB)
-    axes[0].set_title("Clasificacion ABC por Ingresos",
-                      fontweight="bold")
+    axes[0].set_title("Clasificacion ABC por Ingresos", fontweight="bold")
 
     axes[1].bar(range(len(df_abc)), df_abc["porcentaje"],
                 color=colores, edgecolor=DARK_BG)
     ax2 = axes[1].twinx()
     ax2.plot(range(len(df_abc)), df_abc["acumulado"],
-             color=ACCENT, linewidth=2.5,
-             marker="o", markersize=6)
-    ax2.axhline(y=80,  color="#ff6b6b", linestyle="--",
+             color=ACCENT, linewidth=2.5, marker="o", markersize=6)
+    ax2.axhline(y=80, color="#ff6b6b", linestyle="--",
                 linewidth=1.2, alpha=0.7)
-    ax2.axhline(y=95,  color="#ffd166", linestyle="--",
+    ax2.axhline(y=95, color="#ffd166", linestyle="--",
                 linewidth=1.2, alpha=0.7)
     ax2.set_ylim(0, 115)
     ax2.set_ylabel("% Acumulado", color=TEXT_SUB)
@@ -589,10 +526,8 @@ def fig_abc(df_abc):
         [n.split()[0] for n in df_abc["nombre"]],
         rotation=15, fontsize=8
     )
-    axes[1].set_title("Curva de Pareto — Regla 80/20",
-                      fontweight="bold")
+    axes[1].set_title("Curva de Pareto — Regla 80/20", fontweight="bold")
     axes[1].set_ylabel("% Individual")
-
     estilo_dark(fig, [axes[0], axes[1]])
     ax2.set_facecolor(CARD_BG)
     plt.tight_layout()
@@ -600,9 +535,9 @@ def fig_abc(df_abc):
 
 
 def fig_cobertura(alertas, forecast_mensual, stock_actual):
-    meses  = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
-              "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-    stocks = []
+    meses   = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+               "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    stocks  = []
     stock_r = stock_actual
     for v in forecast_mensual:
         stock_r = max(0, stock_r - v)
@@ -612,8 +547,7 @@ def fig_cobertura(alertas, forecast_mensual, stock_actual):
     ax.bar(meses, forecast_mensual,
            color="#3d4166", label="Demanda forecast", alpha=0.9)
     ax2 = ax.twinx()
-    ax2.plot(meses, stocks,
-             color="#ff6b6b", linewidth=2.5,
+    ax2.plot(meses, stocks, color="#ff6b6b", linewidth=2.5,
              marker="o", markersize=6, label="Stock proyectado")
     ax2.axhline(y=alertas["punto_reorden"],
                 color="#ffd166", linestyle="--", linewidth=1.5,
@@ -621,15 +555,12 @@ def fig_cobertura(alertas, forecast_mensual, stock_actual):
     ax2.set_ylabel("Stock disponible", color=TEXT_SUB)
     ax2.tick_params(colors=TEXT_SUB)
     ax.set_ylabel("Demanda mensual")
-    ax.set_title("Proyeccion de Stock vs Demanda 2025",
-                 fontweight="bold")
-
+    ax.set_title("Proyeccion de Stock vs Demanda 2025", fontweight="bold")
     lineas1, labels1 = ax.get_legend_handles_labels()
     lineas2, labels2 = ax2.get_legend_handles_labels()
     ax.legend(lineas1 + lineas2, labels1 + labels2,
               fontsize=8, facecolor=CARD_BG,
               edgecolor=GRID_COLOR, labelcolor=TEXT_SUB)
-
     estilo_dark(fig, ax)
     ax2.set_facecolor(CARD_BG)
     plt.tight_layout()
@@ -666,7 +597,7 @@ def generar_excel(producto, df_hist, forecast_vals,
             })
         df_fore.to_excel(writer, sheet_name="Forecast 2025", index=False)
 
-        df_exp         = df_hist.copy()
+        df_exp          = df_hist.copy()
         df_exp["fecha"] = df_exp["fecha"].dt.strftime("%Y-%m")
         df_exp.columns  = ["Fecha", "Unidades Vendidas", "Ingreso Total"]
         df_exp.to_excel(writer, sheet_name="Historico", index=False)
@@ -706,7 +637,6 @@ def generar_excel(producto, df_hist, forecast_vals,
 # NAVEGACION PRINCIPAL
 # ════════════════════════════════════════════════════════════
 
-# Sidebar
 with st.sidebar:
     st.markdown("""
     <div style='text-align:center; padding: 16px 0'>
@@ -759,7 +689,7 @@ with st.sidebar:
         )
 
     st.markdown("---")
-    st.caption("v3.0 — Febrero 2026")
+    st.caption("v3.0 — 2026")
 
 
 # ════════════════════════════════════════════════════════════
@@ -768,7 +698,6 @@ with st.sidebar:
 
 if pagina == "Inicio":
 
-    # Hero section
     st.markdown("""
     <div class="hero-container">
         <div class="hero-title">📦 TechZone Forecast</div>
@@ -788,10 +717,8 @@ if pagina == "Inicio":
     </div>
     """, unsafe_allow_html=True)
 
-    # Stats destacados
-    df_todos = cargar_todos()
+    df_todos       = cargar_todos()
     total_ingresos = df_todos["ingresos_totales"].sum()
-    total_unidades = df_todos["unidades_totales"].sum()
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -799,62 +726,58 @@ if pagina == "Inicio":
         <div class="stat-highlight">
             <div class="stat-number">5</div>
             <div class="stat-label">Productos analizados</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     with col2:
         st.markdown("""
         <div class="stat-highlight">
             <div class="stat-number">36</div>
             <div class="stat-label">Meses de historial</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     with col3:
-        st.markdown(f"""
+        st.markdown("""
         <div class="stat-highlight">
             <div class="stat-number">3.9%</div>
             <div class="stat-label">Error del modelo (MAPE)</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     with col4:
         st.markdown(f"""
         <div class="stat-highlight">
             <div class="stat-number">${total_ingresos/1_000_000:.1f}M</div>
             <div class="stat-label">Ingresos analizados</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Features
     st.markdown(
         "<h3 style='color:#ccd6f6; text-align:center'>"
-        "¿Que puede hacer este sistema?</h3>",
+        "Que puede hacer este sistema?</h3>",
         unsafe_allow_html=True
     )
     st.markdown("<br>", unsafe_allow_html=True)
 
-    f1, f2, f3, f4, f5 = st.columns(5)
     features = [
-        ("📈", "Forecast ML", "Predice ventas para los proximos 12 meses usando Prophet con intervalo de confianza del 80%"),
-        ("🔬", "Analisis ABC", "Clasifica productos segun la regla de Pareto para priorizar la gestion de inventario"),
-        ("🚨", "Alertas Stock", "Calcula dias de cobertura, punto de reorden y EOQ en tiempo real"),
-        ("📊", "Visualizacion", "Dashboards interactivos con graficas profesionales de series de tiempo"),
-        ("📥", "Export Excel", "Genera reportes completos en Excel con 4 hojas listas para presentar"),
+        ("📈", "Forecast ML",
+         "Predice ventas para los proximos 12 meses con Prophet e intervalo de confianza del 80%"),
+        ("🔬", "Analisis ABC",
+         "Clasifica productos segun la regla de Pareto para priorizar el inventario"),
+        ("🚨", "Alertas Stock",
+         "Calcula dias de cobertura, punto de reorden y EOQ automaticamente"),
+        ("📊", "Visualizacion",
+         "Dashboards con graficas profesionales de series de tiempo"),
+        ("📥", "Export Excel",
+         "Reportes completos en Excel con 4 hojas listos para presentar"),
     ]
-    for col, (icon, title, desc) in zip([f1, f2, f3, f4, f5], features):
+    cols = st.columns(5)
+    for col, (icon, title, desc) in zip(cols, features):
         with col:
             st.markdown(f"""
             <div class="feature-card">
                 <div class="feature-icon">{icon}</div>
                 <div class="feature-title">{title}</div>
                 <div class="feature-desc">{desc}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("---")
-
-    # Preview grafica
     st.markdown(
         "<h3 style='color:#ccd6f6'>Vista previa — Historico de ventas</h3>",
         unsafe_allow_html=True
@@ -868,46 +791,43 @@ if pagina == "Inicio":
     )
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Como funciona
     st.markdown("---")
     st.markdown(
         "<h3 style='color:#ccd6f6'>Como funciona</h3>",
         unsafe_allow_html=True
     )
-    p1, p2, p3, p4 = st.columns(4)
     pasos = [
-        ("1", "#64ffda", "Datos", "3 anos de historial de ventas almacenados en SQLite"),
-        ("2", "#ffd166", "Analisis", "EDA para detectar tendencias y patrones de estacionalidad"),
-        ("3", "#ff6b6b", "Modelo ML", "Prophet aprende los patrones y genera predicciones con intervalos"),
-        ("4", "#06d6a0", "Decision", "Alertas de stock, clasificacion ABC y reportes para la gerencia"),
+        ("1", "#64ffda", "Datos",
+         "3 anos de historial de ventas almacenados en SQLite"),
+        ("2", "#ffd166", "Analisis",
+         "EDA para detectar tendencias y patrones de estacionalidad"),
+        ("3", "#ff6b6b", "Modelo ML",
+         "Prophet aprende los patrones y genera predicciones con intervalos"),
+        ("4", "#06d6a0", "Decision",
+         "Alertas de stock, clasificacion ABC y reportes para la gerencia"),
     ]
-    for col, (num, color, titulo, desc) in zip([p1, p2, p3, p4], pasos):
+    cols = st.columns(4)
+    for col, (num, color, titulo, desc) in zip(cols, pasos):
         with col:
             st.markdown(f"""
             <div style="background:#1e2130; border:1px solid {color};
                         border-radius:12px; padding:20px; text-align:center">
                 <div style="font-size:2rem; font-weight:800; color:{color}">
-                    {num}
-                </div>
+                    {num}</div>
                 <div style="color:#ccd6f6; font-weight:600; margin:8px 0">
-                    {titulo}
-                </div>
-                <div style="color:#8892b0; font-size:0.85rem">
-                    {desc}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                    {titulo}</div>
+                <div style="color:#8892b0; font-size:0.85rem">{desc}</div>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.info(
-        "Usa el menu de la izquierda para navegar entre las secciones "
-        "del sistema. Empeza por Forecast para ver las predicciones."
+        "Usa el menu de la izquierda para navegar. "
+        "Empeza por Forecast para ver las predicciones."
     )
 
 
 # ════════════════════════════════════════════════════════════
-# PAGINAS INTERNAS
+# PAGINA FORECAST
 # ════════════════════════════════════════════════════════════
 
 elif pagina == "Forecast":
@@ -956,6 +876,13 @@ elif pagina == "Forecast":
     with tab_hist:
         st.pyplot(fig_historico(df, producto_sel))
         st.caption("Zonas rojas: Noviembre-Diciembre (Black Friday y Navidad)")
+        with st.expander("Ver datos crudos"):
+            df_m          = df.copy()
+            df_m["fecha"] = df_m["fecha"].dt.strftime("%Y-%m")
+            df_m["ingreso_total"] = df_m["ingreso_total"].apply(
+                lambda x: f"${x:,.2f}"
+            )
+            st.dataframe(df_m, use_container_width=True)
 
     with tab_fore:
         st.pyplot(fig_forecast(
@@ -994,6 +921,10 @@ elif pagina == "Forecast":
             st.dataframe(tabla, use_container_width=True, hide_index=True)
 
 
+# ════════════════════════════════════════════════════════════
+# PAGINA ANALISIS ABC
+# ════════════════════════════════════════════════════════════
+
 elif pagina == "Analisis ABC":
     st.markdown(
         "<h2 style='color:#ccd6f6'>Analisis ABC — Clasificacion de Productos</h2>",
@@ -1024,7 +955,15 @@ elif pagina == "Analisis ABC":
     df_tabla["% Acumulado"]  = df_tabla["% Acumulado"].apply(
         lambda x: f"{x:.1f}%")
     st.dataframe(df_tabla, use_container_width=True, hide_index=True)
+    st.info(
+        "Recomendacion: concentra el 80% de tu presupuesto de "
+        "inventario en los productos Categoria A."
+    )
 
+
+# ════════════════════════════════════════════════════════════
+# PAGINA ALERTAS DE STOCK
+# ════════════════════════════════════════════════════════════
 
 elif pagina == "Alertas de Stock":
     df      = cargar_serie(producto_sel)
@@ -1051,7 +990,7 @@ elif pagina == "Alertas de Stock":
     else:
         _, forecast_vals = modelo_ses(valores)
 
-    alertas = calcular_alertas(
+    alertas              = calcular_alertas(
         forecast_vals, stock_actual, lead_time, precio_prod
     )
     alertas["stock_input"] = stock_actual
@@ -1074,25 +1013,28 @@ elif pagina == "Alertas de Stock":
         st.metric("Punto de reorden",
                   f"{alertas['punto_reorden']} u")
     with col4:
-        st.metric("EOQ recomendado",
-                  f"{alertas['eoq']} u")
+        st.metric("EOQ recomendado", f"{alertas['eoq']} u")
 
     st.pyplot(fig_cobertura(alertas, forecast_vals, stock_actual))
 
     with st.expander("Que significa cada indicador?"):
         st.markdown(f"""
         - **Dias de cobertura**: con {stock_actual} u en stock y demanda
-          diaria de {alertas['demanda_diaria']} u/dia, tenes para
+          diaria de {alertas['demanda_diaria']} u/dia, tenes stock para
           {alertas['dias_cobertura']} dias.
         - **Punto de reorden ({alertas['punto_reorden']} u)**: cuando
-          bajes a este nivel, hace el pedido para que llegue antes de
-          quedarte sin stock (Lead Time: {lead_time} dias).
+          bajes a este nivel, hace el pedido considerando
+          {lead_time} dias de Lead Time del proveedor.
         - **Stock de seguridad ({alertas['stock_seguridad']} u)**:
           colchon para absorber variaciones inesperadas.
         - **EOQ ({alertas['eoq']} u)**: cantidad optima por pedido
           que minimiza costos de ordenar y almacenar.
         """)
 
+
+# ════════════════════════════════════════════════════════════
+# PAGINA EXPORTAR
+# ════════════════════════════════════════════════════════════
 
 elif pagina == "Exportar":
     df      = cargar_serie(producto_sel)
@@ -1102,21 +1044,13 @@ elif pagina == "Exportar":
         "<h2 style='color:#ccd6f6'>Exportar Reporte a Excel</h2>",
         unsafe_allow_html=True
     )
-    st.markdown("""
-    <p style='color:#8892b0'>
-    Genera un archivo Excel completo con 4 hojas listo para presentar
-    a gerencia o incluir en informes de supply chain.
-    </p>
-    """, unsafe_allow_html=True)
 
     col_a, col_b, col_c, col_d = st.columns(4)
     for col, titulo, desc in zip(
         [col_a, col_b, col_c, col_d],
         ["Forecast 2025", "Historico", "Analisis ABC", "Alertas Stock"],
-        ["Predicciones mensuales con intervalos",
-         "Ventas reales 2022-2024",
-         "Clasificacion de los 5 productos",
-         "Indicadores de reposicion"]
+        ["Predicciones con intervalos", "Ventas 2022-2024",
+         "Clasificacion productos", "Indicadores reposicion"]
     ):
         with col:
             st.markdown(f"""
@@ -1124,10 +1058,8 @@ elif pagina == "Exportar":
                         border-radius:10px; padding:16px; text-align:center">
                 <div style="color:#64ffda; font-weight:600">{titulo}</div>
                 <div style="color:#8892b0; font-size:0.85rem; margin-top:6px">
-                    {desc}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                    {desc}</div>
+            </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1168,7 +1100,3 @@ elif pagina == "Exportar":
               ".spreadsheetml.sheet"
     )
     st.success(f"Reporte listo: {nombre}")
-    st.caption(
-        "Incluye forecast del producto seleccionado con el stock "
-        "y lead time configurados en el panel lateral."
-    )
